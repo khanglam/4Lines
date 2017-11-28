@@ -87,18 +87,36 @@ public class Opponent {
 
 	public boolean TerminalTest(char[] state)
 	{
-		if(turn == 0) {
-			piece = 'O';
-			opposingPiece = 'X';
-		}else { 
-			piece = 'X';
-			opposingPiece = 'O';
-		}
+		boolean board_filled = true;
 		for(int i = 0; i < state.length; i++)
 		{
-			
+			if(state[i] == ' ') 
+			{
+				board_filled = false;
+				continue;
+			}
+			if(( (i+1) % 8 != 0 ) && ((i+2) % 8 != 0) && 
+					((i+3) % 8 != 0))  //check borders
+			{
+				if((state[i] == piece) && (state[i+1] == piece) && 
+						(state[i+2] == piece) && (state[i+3] == piece))
+					return true;
+				if((state[i] == opposingPiece) && (state[i+1] == opposingPiece) && 
+						(state[i+2] == opposingPiece) && (state[i+3] == opposingPiece))
+					return true;
+			}
+			if(( (i< 40) && (i+8) % 8 != 0 ) && ((i+16) % 8 != 0) && 
+					((i+24) % 8 != 0))  //i < 40 because out of bounds
+			{			//Check bottom borders
+				if((state[i] == piece) && (state[i+8] == piece) && 
+						(state[i+16] == piece) && (state[i+24] == piece))
+					return true;
+				if((state[i] == opposingPiece) && (state[i+8] == opposingPiece) && 
+						(state[i+16] == opposingPiece) && (state[i+24] == opposingPiece))
+					return true;
+			}
 		}
-		return false;
+		return board_filled;
 	}
 	
 	public int evaluate(char[] state)
