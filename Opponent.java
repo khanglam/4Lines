@@ -1,5 +1,7 @@
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 
 public class Opponent {
@@ -7,9 +9,13 @@ public class Opponent {
 	private int turn;
 	private char piece;
 	private char opposingPiece;
+	private final int INFINITY = Integer.MAX_VALUE;
 	private int timeLimit;
-	private List<char[]> successors = new ArrayList<char[]>();
+//	private List<Successors> successors = new ArrayList<Successors>();
+	private Queue<Successors> successors = new LinkedList<Successors>();
 	private boolean isOver = false;
+	private Successors child;
+	private char[] chosenPath;
 	
 	public Opponent(char[] state, int turn, int timeLimit)
 	{
@@ -24,62 +30,45 @@ public class Opponent {
 			opposingPiece = 'O';
 		}
 	}
-	
-	public void generateSuccessors()
-	{
-		if(turn == 0) //if opponent is O
-		{
-			for(int i = 0; i < state.length; i++)
-			{
-				if(state[i] != 'X')
-				{
-					state[i] = 'O';
-					successors.add(state);
-					state[i] = ' ';
-				}
-			}
-		}
-		else //if Opponent is X
-		{
-			for(int i = 0; i < state.length; i++)
-			{
-				if(state[i] != 'O')
-				{
-					state[i] = 'X';
-					successors.add(state);
-					state[i] = ' ';
-				}
-			}
-		}
-	}
+
 	
 	public char[] AlphaBetaSearch(char[] state)
 	{
-		int v = MaxMove(state, -Integer.MAX_VALUE, Integer.MAX_VALUE);
-		return state; //this is wrong but idk how to do this yet
+		int v = MaxMove(state, -INFINITY, INFINITY);
+		return chosenPath;
 	}
 	
 	public int MaxMove(char[] state, int a, int B)
 	{
-		if(TerminalTest(state)) return evaluate(state);
-		int v = -Integer.MAX_VALUE;
-		for(int i = 0; i < successors.size(); i++)
+		child = new Successors(state);
+		if(TerminalTest(state)) return utility(state);
+		int v = -INFINITY;
+		child.generateSuccessors(turn);
+//		successors.add(child);
+		for(int i = 0; i < child.successors.size(); i++)
 		{
-			v = Math.max(v, MinMove(successors.get(i), a, B));
-			if(v >= B) return v;
-			a = Math.max(a, v);
+			v = Math.max(v, MinMove(child.successors.get(i), a, B));
+			if(v >= B) return v; //for pruning
+//			a = Math.max(a, v);
+			if(v >= a)
+			{
+				a = v;
+				chosenPath = child.successors.get(i); //To retrace chosen path
+			}
 		}
 		return v;
 	}
 	
 	private int MinMove(char[] state, int a, int B) 
 	{
-		if(TerminalTest(state)) return evaluate(state);
-		int v = Integer.MAX_VALUE;
-		for(int i = 0; i < successors.size(); i++)
+		child = new Successors(state);
+		if(TerminalTest(state)) return utility(state);
+		int v = INFINITY;
+		child.generateSuccessors(turn);
+		for(int i = 0; i < child.successors.size(); i++)
 		{
-			v = Math.min(v, MaxMove(successors.get(i), a, B));
-			if(v <= a) return v;
+			v = Math.min(v, MaxMove(child.successors.get(i), a, B));
+			if(v <= a) return v; //for pruning
 			B = Math.min(B, v);
 		}
 		return v;
@@ -119,122 +108,150 @@ public class Opponent {
 		return board_filled;
 	}
 	
-	public int evaluate(char[] state)
-	{
-		int score = 0;
-		if(turn == 0) //if AI is O
-		{
-			for(int i = 0; i < state.length; i++)
-			{
-				if(state[i] == 'O')
-				{
-					score += 1;
-				}
-				else if(state[i] == 'X')
-					score -= 1;
-			}
-		}
-		return 0;
-	}
 	
-	public int heuristicCheck(char[] state)
-	{
+	public int utility(char[] state) {
 		int score = 0;
 		int opposingScore = 0;
-		char piece;
-		char opposingPiece;
-		if(turn == 0) {
-			piece = 'O';
-			opposingPiece = 'X';
-		}else { 
-			piece = 'X';
-			opposingPiece = 'O';
-		}
-		
-		final int SPACE_ONE = 8;
-		final int SPACE_TWO = 16;
-		final int SPACE_THREE = 24;
-		boolean verticalUp = true, verticalDown = true;
-		
+		boolean spaceBetween = false;
 		for(int i = 0; i < state.length; i++)
 		{
+			score = verticalCheck(i, score, piece, opposingPiece, spaceBetween);//,
 
-			score = verticalCheck(i, score, opposingScore, piece, opposingPiece,
-								  SPACE_ONE, SPACE_TWO, SPACE_THREE,
-								  verticalUp, verticalDown);
-			score = horizontalCheck(i, score, opposingScore, piece, opposingPiece);
+			if (score == INFINITY) return score;
+			
+			score = horizontalCheck(i, score, piece, opposingPiece, spaceBetween);
+			
+			if (score == INFINITY) return score;
+			
+			opposingScore = verticalCheck(i, opposingScore, opposingPiece, piece, spaceBetween);//,
+			
+			if (opposingScore == INFINITY) return -opposingScore;
+			
+			opposingScore = horizontalCheck(i, opposingScore, opposingPiece, piece, spaceBetween);
+			
+			if (opposingScore == INFINITY) return -opposingScore;
+			
 		}
-		return score;
+		return score - opposingScore;
 	}
 	
-	public int verticalCheck(int i, int score, int opposingScore, char piece, char opposingPiece, 
-							 int SPACE_ONE, int SPACE_TWO, int SPACE_THREE, 
-							 boolean verticalUp, boolean verticalDown)
+	public int verticalCheck(int i, int score, char piece, char opposingPiece, boolean spaceBetween)
 	{
+
 		if (state[i] == piece) {
-			verticalDown = true;
-			verticalUp = true;
-			if (i + SPACE_THREE < state.length) {//upper bound 
-				if (state[i + SPACE_ONE] == opposingPiece) {
-					verticalDown = false;
-					} else if (state[i + SPACE_TWO] == opposingPiece) {
-						verticalDown = false;
-					} else if (state[i + SPACE_THREE] == opposingPiece) {
-						verticalDown = false;
-					}
-			} else {
-				verticalDown = false;
+			int addScore = 0;
+			if (i + 24 < state.length) {//upper rows
+				if (state[i + 8] != opposingPiece  && 
+					state[i + 16] != opposingPiece && 
+					state[i + 24] != opposingPiece) {
+					
+					if ((state[i + 8] == piece) && 
+						(state[i +16] == piece) && 
+						(state[i+ 24] == piece))
+						return INFINITY;
+					
+					if (state[i + 8] == piece) addScore++;
+					else spaceBetween = true;
+ 
+					if (state[i + 16] == piece && !spaceBetween) addScore++;
+					else spaceBetween = true;
+					
+					if (state[i + 24] == piece && !spaceBetween) addScore++;
+					
+					addScore++;
+				}
 			}
 			
-			if (i - SPACE_THREE >= 0) {
-				if (state[i - SPACE_ONE] == opposingPiece) {
-					verticalUp = false;
-					} else if (state[i - SPACE_TWO] == opposingPiece) {
-						verticalUp = false;
-					} else if (state[i - SPACE_THREE] == opposingPiece) {
-						verticalUp = false;
-					}
-			} else {
-				verticalUp = false;
+			spaceBetween = false;
+			if (i - 24 >= 0) {
+				if (state[i - 8]  != opposingPiece && 
+					state[i - 16] != opposingPiece && 
+					state[i - 24] != opposingPiece) {
+					
+					if ((state[i - 8] == piece) && 
+							(state[i -16] == piece) && 
+							(state[i -24] == piece))
+							return INFINITY;
+					
+					if (state[i - 8] == piece) addScore++;
+					else spaceBetween = true;
+ 
+					if (state[i - 16] == piece && !spaceBetween)  addScore++;
+					else spaceBetween = true;
+					
+					if (state[i - 24] == piece && !spaceBetween) addScore++;
+					
+					addScore++;
+				}
 			}
 			
-			if (verticalDown)
-				score++;
+			score += addScore;
 			
-			if (verticalUp)
-				score++;
 		}
+		
 		return score;
 	}
 	
-	public int horizontalCheck(int i, int score, int opposingScore, char piece, char opposingPiece)
-	{
+	public int horizontalCheck(int i, int score, char piece, char opposingPiece, boolean spaceBetween) {
 		char hole = ' ';
 		
-		if(state[i] == piece)
-		{
-			
+		if(state[i] == piece) {
+			int addScore = 0;
 			//Check right horizontal
-			if(( (i+1) % 8 != 0 ) && ((i+2) % 8 != 0) && 
-					((i+3) % 8 != 0))  //move on to next row
-			{
-				if((state[i+1] == hole || state[i+1] == piece) &&
-						(state[i+2] == hole || state[i+2] == piece) &&
-						(state[i+3] == hole || state[i+3] == piece))
-					score += 1;
-				else if((state[i+1] == hole || state[i+1] == opposingPiece) &&
-						(state[i+2] == hole || state[i+2] == opposingPiece) &&
-						(state[i+3] == hole || state[i+3] == opposingPiece))
-					opposingScore += 1;
-			}
-			if((i % 8) >= 3)//Check left horizontal
-				{
-					if((state[i-1] == hole || state[i-1] == piece) &&
-						(state[i-2] == hole || state[i-2] == piece) &&
-						(state[i-3] == hole || state[i-3] == piece))
-					score += 1;
+			if(( (i+1) % 8 != 0 ) && ((i+2) % 8 != 0) && ((i+3) % 8 != 0))  {
+				if(state[i+1] != opposingPiece && 
+				   state[i+2] != opposingPiece && 
+				   state[i+3] != opposingPiece) {
+					
+					if ((state[i + 1] == piece) && 
+						(state[i + 2] == piece) && 
+						(state[i + 3] == piece))
+							return INFINITY;
+					
+					if (state[i + 1] == piece) addScore++;
+					else spaceBetween = true;
+ 
+					if (state[i + 2] == piece && !spaceBetween) addScore++;
+					else spaceBetween = true;
+					
+					if (state[i + 3] == piece && !spaceBetween) addScore++;
+					
+					addScore++;
+				
 				}
+			}	
+			spaceBetween = false;
+			//Check left horizontal
+			if((i % 8) >= 3) {
+				if(state[i-1] != opposingPiece && 
+				   state[i-2] != opposingPiece && 
+				   state[i-3] != opposingPiece) {
+					
+					if ((state[i - 1] == piece) && 
+						(state[i - 2] == piece) && 
+						(state[i - 3] == piece))
+							return INFINITY;
+					
+					if (state[i - 1] == piece) addScore++;
+					else spaceBetween = true;
+ 
+					if (state[i - 2] == piece && !spaceBetween) addScore++;
+					else spaceBetween = true;
+					
+					if (state[i - 3] == piece && !spaceBetween) addScore++;
+					
+					addScore++;
+					
+					
+				}
+					//if((state[i-1] == hole || state[i-1] == piece) &&
+					//	(state[i-2] == hole || state[i-2] == piece) &&
+					//	(state[i-3] == hole || state[i-3] == piece))
+					//score += 1;
+			}
+			score += addScore;
 		}
+		
 		return score;
 	}
 }

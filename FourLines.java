@@ -24,7 +24,7 @@ public class FourLines {
 						'X','O','O','X','O','O','X','O'
 						};
 		Opponent AI = new Opponent(board, 0, 0);
-		AI.heuristicCheck(board);
+		AI.utility(board);
 		System.out.print(AI.TerminalTest(board));
 //		promptUser();
 	}
