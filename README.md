@@ -1,2 +1,2 @@
 # 4Lines
-An Artificial Intelligence Game developed in Java as part of a Team's Activity :)
+An Artificial Intelligence Game developed in Java to test out various algorithms such as alpha-beta pruning :)
